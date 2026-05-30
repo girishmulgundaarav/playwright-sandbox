@@ -1,0 +1,26 @@
+"use client";
+
+import React from "react";
+
+export default function NewTabPage() {
+  return (
+    <div className="flex-1 bg-slate-50 min-h-screen flex items-center justify-center p-4">
+      <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 shadow-md text-center">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 text-blue-600 mb-6">
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        </div>
+        <h1
+          data-testid="new-tab-header"
+          className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+        >
+          New Tab Content
+        </h1>
+        <p className="mt-4 text-sm text-slate-500 leading-relaxed">
+          This content was successfully loaded inside a completely separate browser tab. E2E automation tests can switch context to this page handler to inspect this element.
+        </p>
+      </div>
+    </div>
+  );
+}
