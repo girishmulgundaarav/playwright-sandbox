@@ -16,9 +16,9 @@ export default function Home() {
     {
       id: "forms",
       title: "Forms & Controls",
-      description: "Interact with diverse form controls, validate states, select dropdown options, and check radio buttons or checkboxes.",
+      description: "Interact with dynamic consent checkboxes, password strength meters, debounced async username checkers, format mask inputs, character counters, and multi-file drops.",
       href: "/forms",
-      tags: ["Inputs", "Dropdowns", "Checkboxes", "Validation"],
+      tags: ["Validation", "Async Status", "Masking", "Multi-File Upload"],
       testId: "card-forms",
       gradient: "from-blue-500 to-cyan-500",
       icon: (

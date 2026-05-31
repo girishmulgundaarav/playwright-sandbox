@@ -12,11 +12,26 @@ export default function DomPage() {
   // ZONE 3: Shadow DOM Ref
   const shadowHostRef = useRef<HTMLDivElement>(null);
 
+  // ZONE 4: Sibling Locating State
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  // ZONE 5: Stale Element State
+  const [staleKey, setStaleKey] = useState(0);
+  const [staleHits, setStaleHits] = useState(0);
+  const [isStalePending, setIsStalePending] = useState(false);
+
+  // ZONE 6: Dynamic ID State
+  const [dynamicId, setDynamicId] = useState("");
+  const [dynamicClicks, setDynamicClicks] = useState(0);
+
+  useEffect(() => {
+    setDynamicId(`btn-${Math.random().toString(36).substring(2, 7)}`);
+  }, [dynamicClicks]);
+
   useEffect(() => {
     if (shadowHostRef.current && !shadowHostRef.current.shadowRoot) {
       const shadowRoot = shadowHostRef.current.attachShadow({ mode: "open" });
 
-      // Create styling
       const style = document.createElement("style");
       style.textContent = `
         .shadow-wrapper {
@@ -56,7 +71,6 @@ export default function DomPage() {
         }
       `;
 
-      // Create content wrapper
       const wrapper = document.createElement("div");
       wrapper.className = "shadow-wrapper";
 
@@ -109,6 +123,15 @@ export default function DomPage() {
     }
   };
 
+  const handleTriggerStale = () => {
+    setIsStalePending(true);
+    setTimeout(() => {
+      setStaleKey((prev) => prev + 1);
+      setStaleHits((prev) => prev + 1);
+      setIsStalePending(false);
+    }, 300);
+  };
+
   return (
     <div
       data-testid="dom-page"
@@ -132,7 +155,7 @@ export default function DomPage() {
             DOM & Locating Practice
           </h1>
           <p className="mt-4 text-base text-slate-600">
-            Practice handling native dialog alerts, locating elements in frames, and piercing open Shadow DOM trees.
+            Practice handling native dialog alerts, locating elements in nested frames, relative sibling searches, piercing open Shadow DOM trees, and bypassing staleness or dynamic ID structures.
           </p>
         </div>
 
@@ -143,7 +166,7 @@ export default function DomPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-50 text-purple-650 border border-purple-200 font-bold text-sm">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-50 text-purple-655 border border-purple-200 font-bold text-sm">
                   1
                 </span>
                 <h2 className="text-xl font-bold text-slate-900">Browser Modals & Dialogs</h2>
@@ -177,7 +200,7 @@ export default function DomPage() {
                     {confirmResult && (
                       <span
                         data-testid="confirm-result"
-                        className="text-xs text-emerald-800 font-bold font-mono bg-emerald-50 px-2 py-0.5 border border-emerald-200 rounded"
+                        className="text-xs text-emerald-800 font-bold font-mono bg-emerald-50 px-2 py-0.5 border border-emerald-250 rounded"
                       >
                         Result: {confirmResult}
                       </span>
@@ -217,13 +240,13 @@ export default function DomPage() {
             </div>
           </section>
 
-          {/* ZONE 3: Shadow DOM */}
+          {/* ZONE 2: Shadow DOM */}
           <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
             <div className="h-full flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-6">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-pink-50 text-pink-650 border border-pink-200 font-bold text-sm">
-                    3
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-pink-50 text-pink-655 border border-pink-200 font-bold text-sm">
+                    2
                   </span>
                   <h2 className="text-xl font-bold text-slate-900">Shadow DOM Boundary</h2>
                 </div>
@@ -243,20 +266,170 @@ export default function DomPage() {
             </div>
           </section>
 
-          {/* ZONE 2: Embedded iframe */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between md:col-span-2">
+          {/* ZONE 3: Sibling Plan Selector (Relative Locating) */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-6">
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-blue-600 border border-blue-200 font-bold text-sm">
-                  2
+                  3
                 </span>
-                <h2 className="text-xl font-bold text-slate-900">Embedded Frame / iFrame</h2>
+                <h2 className="text-xl font-bold text-slate-900">Relative Sibling Locators</h2>
               </div>
               <p className="text-sm text-slate-600 mb-6">
-                Practice frame navigation. The form below is embedded inside a separate document inside an iframe. Switch context using frameLocator to interact.
+                Locate specific cards based on title (e.g. &ldquo;Professional Plan&rdquo;) and click the relative &ldquo;Select Plan&rdquo; button inside.
               </p>
 
-              {/* iframe container */}
+              <div className="space-y-4">
+                {/* Subscription plans list */}
+                {["Starter Plan", "Professional Plan", "Enterprise Plan"].map((plan) => (
+                  <div
+                    key={plan}
+                    data-testid={`plan-card-${plan.toLowerCase().replace(" ", "-")}`}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      selectedPlan === plan
+                        ? "bg-emerald-50/50 border-emerald-250 shadow-emerald-500/5"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">{plan}</h4>
+                      <p className="text-[10px] text-slate-450 mt-1">
+                        {plan === "Starter Plan" ? "$10/mo" : plan === "Professional Plan" ? "$29/mo" : "$99/mo"} — Active
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlan(plan)}
+                      className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${
+                        selectedPlan === plan
+                          ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                          : "bg-indigo-50 border border-indigo-150 text-indigo-600 hover:bg-indigo-100"
+                      }`}
+                    >
+                      Select Plan
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 4: Stale Element Simulator */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-orange-50 text-orange-600 border border-orange-200 font-bold text-sm">
+                  4
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Stale Element Simulator</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Clicking completely unmounts the button node and appends an identical-looking node after 300ms. Caching elements causes stale failures.
+              </p>
+
+              <div className="min-h-[140px] flex flex-col items-center justify-center rounded-xl bg-slate-50 border border-slate-200 p-6 mb-6">
+                <div className="w-full text-center mb-4">
+                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wide">Valid Hits recorded</span>
+                  <p data-testid="stale-click-counter" className="text-2xl font-extrabold text-slate-850 mt-1">{staleHits}</p>
+                </div>
+
+                <div className="w-full">
+                  {isStalePending ? (
+                    <div className="flex justify-center items-center gap-2 text-xs text-slate-450 animate-pulse py-2.5 font-semibold">
+                      <svg className="animate-spin h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Re-creating element reference...
+                    </div>
+                  ) : (
+                    <button
+                      key={staleKey}
+                      onClick={handleTriggerStale}
+                      data-testid="stale-trigger-btn"
+                      className="w-full rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-2.5 text-xs font-semibold text-indigo-650 hover:bg-indigo-100 transition-all"
+                    >
+                      Trigger Node Re-creation
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 5: Dynamic ID & Class Attributes */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-cyan-50 text-cyan-600 border border-cyan-200 font-bold text-sm">
+                  5
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Dynamic ID & Attributes</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                The button&apos;s ID randomizes (e.g. <code className="bg-slate-100 px-1 py-0.5 rounded text-indigo-650 font-mono text-xs">{dynamicId || "btn-xxxx"}</code>) on every click. Locate using stable text patterns.
+              </p>
+
+              <div className="min-h-[145px] flex flex-col items-center justify-center rounded-xl bg-slate-50 border border-slate-200 p-6">
+                <div className="w-full mb-4 text-center">
+                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wide">Validation status</span>
+                  {dynamicClicks > 0 ? (
+                    <p data-testid="identity-validation-badge" className="text-xs text-emerald-800 font-bold bg-emerald-50 border border-emerald-250 rounded-lg px-3 py-1 mt-1.5 inline-block">
+                      ✓ Validation Success ({dynamicClicks} clicks)
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic mt-1.5">Unverified</p>
+                  )}
+                </div>
+
+                <button
+                  id={dynamicId}
+                  onClick={() => setDynamicClicks((prev) => prev + 1)}
+                  data-testid="dynamic-id-btn"
+                  className="w-full rounded-lg bg-indigo-650 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-600 active:bg-indigo-750 transition-all"
+                >
+                  Validate Identity
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 6: Deeply Nested iframes */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-teal-50 text-teal-605 border border-teal-200 font-bold text-sm">
+                  6
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Deeply Nested iFrames</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Practice chaining frames. The input resides in a Level 2 iframe inside a Level 1 iframe. Switch contexts recursively to click.
+              </p>
+
+              <div className="w-full rounded-xl border border-slate-200 overflow-hidden bg-white">
+                <iframe
+                  src="/dom/nested-iframe-parent"
+                  data-testid="nested-parent-iframe"
+                  className="w-full h-[230px] border-none"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 7: Embedded iframe (Single Frame) */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between md:col-span-2">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-pink-50 text-pink-650 border border-pink-200 font-bold text-sm">
+                  7
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Embedded iFrame (Single Frame)</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Practice standard single-frame navigation. Locate and type inside the iframe form below.
+              </p>
+
               <div className="w-full rounded-xl border border-slate-200 overflow-hidden bg-white">
                 <iframe
                   src="/dom/iframe-content"

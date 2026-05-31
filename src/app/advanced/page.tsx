@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 export default function AdvancedPage() {
   // ZONE 1: Drag and Drop State
@@ -21,6 +21,29 @@ export default function AdvancedPage() {
   const [isCanvasBlank, setIsCanvasBlank] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawing = useRef(false);
+
+  // ZONE 6: Custom Context Menu & Double Click States
+  const [isDoubleClicked, setIsDoubleClicked] = useState(false);
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+  const [contextMenuAction, setContextMenuAction] = useState("");
+
+  // ZONE 7: Lasso Multi-Select States
+  const [selectedLassoCells, setSelectedLassoCells] = useState<number[]>([]);
+  const [lassoMarquee, setLassoMarquee] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const lassoContainerRef = useRef<HTMLDivElement | null>(null);
+  const [isLassoDragging, setIsLassoDragging] = useState(false);
+  const lassoStartPos = useRef({ x: 0, y: 0 });
+
+  // ZONE 8: Resizable Splitter States
+  const [leftWidth, setLeftWidth] = useState(30); // 30%
+  const [isResizing, setIsResizing] = useState(false);
+  const resizableContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // ZONE 9: Keyboard Hotkeys States
+  const [heldKeys, setHeldKeys] = useState<string[]>([]);
+  const [hotkeyStatus, setHotkeyStatus] = useState("");
+
 
   // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent) => {
@@ -155,6 +178,196 @@ export default function AdvancedPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setIsCanvasBlank(true);
   };
+
+  // Context Menu Closer
+  useEffect(() => {
+    const closeMenu = () => setContextMenuVisible(false);
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, []);
+
+  // Splitter Resizer MouseMove/MouseUp Effect
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = resizableContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const percentage = Math.max(10, Math.min(90, (offsetX / rect.width) * 100));
+        setLeftWidth(Math.round(percentage));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const handleDoubleClick = () => {
+    setIsDoubleClicked((prev) => !prev);
+  };
+
+  // Context Menu Handlers
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    setContextMenuVisible(true);
+    setContextMenuAction("");
+  };
+
+  const handleContextMenuAction = (actionName: string) => {
+    setContextMenuAction(actionName);
+    setContextMenuVisible(false);
+  };
+
+  // Lasso Multi-Select Drag Handlers
+  const handleLassoMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-testid^='lasso-cell-']")) {
+      return; 
+    }
+
+    const container = lassoContainerRef.current;
+    if (!container) return;
+
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    setIsLassoDragging(true);
+    lassoStartPos.current = { x: clientX, y: clientY };
+    setSelectedLassoCells([]);
+    setLassoMarquee({
+      left: clientX - rect.left,
+      top: clientY - rect.top,
+      width: 0,
+      height: 0
+    });
+  };
+
+  useEffect(() => {
+    if (!isLassoDragging) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const container = lassoContainerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const currentX = e.clientX;
+      const currentY = e.clientY;
+
+      const startX = lassoStartPos.current.x;
+      const startY = lassoStartPos.current.y;
+
+      const left = Math.min(startX, currentX);
+      const top = Math.min(startY, currentY);
+      const width = Math.abs(startX - currentX);
+      const height = Math.abs(startY - currentY);
+
+      const relLeft = left - rect.left;
+      const relTop = top - rect.top;
+
+      setLassoMarquee({
+        left: relLeft,
+        top: relTop,
+        width,
+        height
+      });
+
+      const newSelected: number[] = [];
+      for (let i = 1; i <= 6; i++) {
+        const cell = container.querySelector(`[data-testid="lasso-cell-${i}"]`) as HTMLElement;
+        if (cell) {
+          const cellRect = cell.getBoundingClientRect();
+          const cellLeft = cellRect.left - rect.left;
+          const cellTop = cellRect.top - rect.top;
+          const cellRight = cellLeft + cellRect.width;
+          const cellBottom = cellTop + cellRect.height;
+
+          const intersects = !(
+            relLeft + width < cellLeft ||
+            relLeft > cellRight ||
+            relTop + height < cellTop ||
+            relTop > cellBottom
+          );
+
+          if (intersects) {
+            newSelected.push(i);
+          }
+        }
+      }
+      setSelectedLassoCells(newSelected);
+    };
+
+    const handleWindowMouseUp = () => {
+      setIsLassoDragging(false);
+      setLassoMarquee(null);
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isLassoDragging]);
+
+
+  // Keyboard Hotkeys Handlers
+  const handleHotkeyKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const active: string[] = [];
+    if (e.ctrlKey) active.push("Control");
+    if (e.shiftKey) active.push("Shift");
+    if (e.altKey) active.push("Alt");
+    if (e.metaKey) active.push("Meta");
+    if (e.key && !["Control", "Shift", "Alt", "Meta"].includes(e.key)) {
+      active.push(e.key);
+    }
+    setHeldKeys(active);
+
+    let handled = false;
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "s") {
+      setHotkeyStatus("Progress Saved Successfully!");
+      handled = true;
+    }
+    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === "k") {
+      setHotkeyStatus("");
+      handled = true;
+    }
+    if (e.key === "Escape") {
+      setHotkeyStatus("Reset listener card state");
+      handled = true;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  const handleHotkeyKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const active: string[] = [];
+    if (e.ctrlKey) active.push("Control");
+    if (e.shiftKey) active.push("Shift");
+    if (e.altKey) active.push("Alt");
+    if (e.metaKey) active.push("Meta");
+    setHeldKeys(active);
+  };
+
 
   return (
     <div
@@ -517,6 +730,265 @@ export default function AdvancedPage() {
                     Clear Canvas
                   </button>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 6: Double-Click & Right-Click Custom Menu */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-50 text-purple-650 border border-purple-200 font-bold text-sm">
+                  6
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Custom Context Menu & Double-Click</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Double-click the box below to toggle its visual state, or right-click to reveal a custom context menu. Select options from the custom popup menu.
+              </p>
+
+              <div className="relative min-h-[140px] flex flex-col items-center justify-center rounded-xl bg-slate-50 border border-slate-200 p-6">
+                <div
+                  data-testid="context-menu-target"
+                  onDoubleClick={handleDoubleClick}
+                  onContextMenu={handleContextMenu}
+                  className={`w-48 h-28 rounded-xl border flex flex-col items-center justify-center text-center p-4 transition-all select-none cursor-pointer ${
+                    isDoubleClicked
+                      ? "bg-indigo-650 border-indigo-700 text-white shadow-md shadow-indigo-500/20"
+                      : "bg-white border-slate-250 text-slate-700 hover:bg-slate-100/50"
+                  }`}
+                >
+                  <span className="text-xs font-extrabold uppercase tracking-wide">Target Box</span>
+                  <span className="text-[9px] opacity-75 mt-1">Dbl-Click or Right-Click</span>
+                </div>
+
+                {contextMenuAction && (
+                  <p data-testid="context-action-msg" className="text-xs font-bold text-center text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 mt-4 w-full">
+                    🎉 Action Triggered: {contextMenuAction}
+                  </p>
+                )}
+
+                {/* Custom Context Menu Popup */}
+                {contextMenuVisible && (
+                  <div
+                    data-testid="context-menu-popup"
+                    style={{ top: `${contextMenuPos.y}px`, left: `${contextMenuPos.x}px` }}
+                    className="fixed z-50 w-36 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg flex flex-col gap-0.5"
+                  >
+                    <button
+                      type="button"
+                      data-testid="context-menu-item-edit"
+                      onClick={() => handleContextMenuAction("Edit")}
+                      className="w-full text-left rounded px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-650 transition-colors cursor-pointer"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="context-menu-item-copy"
+                      onClick={() => handleContextMenuAction("Copy")}
+                      className="w-full text-left rounded px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-650 transition-colors cursor-pointer"
+                    >
+                      📋 Copy
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="context-menu-item-delete"
+                      onClick={() => handleContextMenuAction("Delete")}
+                      className="w-full text-left rounded px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 7: Mouse-Drag Lasso Multi-Select */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between md:col-span-2">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold text-sm">
+                  7
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Mouse-Drag Lasso Multi-Select</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Click and drag in the empty space of the grid below to draw a marquee selector. Any cells that intersect the marquee will be selected simultaneously.
+              </p>
+
+              <div
+                ref={lassoContainerRef}
+                onMouseDown={handleLassoMouseDown}
+                data-testid="lasso-container"
+                className="relative w-full rounded-xl bg-slate-50 border border-slate-200 p-6 select-none min-h-[220px]"
+              >
+                <div className="grid grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((num) => {
+                    const isSelected = selectedLassoCells.includes(num);
+                    return (
+                      <div
+                        key={num}
+                        data-testid={`lasso-cell-${num}`}
+                        className={`h-20 rounded-lg border flex flex-col items-center justify-center font-bold text-sm transition-all ${
+                          isSelected
+                            ? "bg-indigo-650 border-indigo-700 text-white shadow-md shadow-indigo-500/20"
+                            : "bg-white border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        Cell {num}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {lassoMarquee && (
+                  <div
+                    data-testid="lasso-marquee"
+                    style={{
+                      position: "absolute",
+                      left: `${lassoMarquee.left}px`,
+                      top: `${lassoMarquee.top}px`,
+                      width: `${lassoMarquee.width}px`,
+                      height: `${lassoMarquee.height}px`,
+                      border: "1.5px dashed #4f46e5",
+                      backgroundColor: "rgba(79, 70, 229, 0.12)",
+                      pointerEvents: "none",
+                      zIndex: 10
+                    }}
+                  />
+                )}
+              </div>
+
+              <div className="flex justify-between items-center mt-4">
+                <span className="text-xs text-slate-500 font-semibold">
+                  Selected Cells Count: <span data-testid="lasso-selected-count" className="text-slate-800 font-bold font-mono">{selectedLassoCells.length}</span>
+                </span>
+                {selectedLassoCells.length > 0 && (
+                  <button
+                    type="button"
+                    data-testid="lasso-reset-btn"
+                    onClick={() => setSelectedLassoCells([])}
+                    className="text-xs font-semibold text-indigo-650 hover:text-indigo-550 underline cursor-pointer"
+                  >
+                    Reset Grid
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 8: Resizable Panel Splitter */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between md:col-span-2">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-blue-650 border border-blue-200 font-bold text-sm">
+                  8
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Resizable Drag Splitter</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Drag the vertical splitter bar left or right to change the split ratio between the sidebar pane and content pane.
+              </p>
+
+              <div 
+                ref={resizableContainerRef}
+                data-testid="resizable-container"
+                className="relative flex border border-slate-200 rounded-xl h-36 overflow-hidden bg-slate-50 select-none"
+              >
+                {/* Left pane */}
+                <div 
+                  data-testid="resizable-left-pane"
+                  style={{ width: `${leftWidth}%` }}
+                  className="bg-slate-100 border-r border-slate-200 flex flex-col items-center justify-center p-2 truncate"
+                >
+                  <span className="text-xs font-bold text-slate-700">Sidebar</span>
+                  <span data-testid="resizable-left-width-display" className="text-[10px] font-mono text-indigo-655 font-bold mt-1">
+                    Width: {leftWidth}%
+                  </span>
+                </div>
+
+                {/* Splitter bar handle */}
+                <div 
+                  data-testid="resizable-splitter"
+                  onMouseDown={() => setIsResizing(true)}
+                  className={`w-2.5 cursor-col-resize hover:bg-indigo-500 active:bg-indigo-600 transition-colors flex items-center justify-center relative z-10 ${
+                    isResizing ? "bg-indigo-500" : "bg-slate-300"
+                  }`}
+                >
+                  <div className="w-0.5 h-6 bg-white opacity-60 rounded" />
+                </div>
+
+                {/* Right pane */}
+                <div 
+                  data-testid="resizable-right-pane"
+                  className="flex-1 bg-white flex flex-col items-center justify-center p-4 truncate"
+                >
+                  <span className="text-xs font-bold text-slate-800">Content Workspace</span>
+                  <span className="text-[10px] text-slate-450 mt-1">Width: {100 - leftWidth}%</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ZONE 9: Keyboard Hotkeys Listener */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xs flex flex-col justify-between md:col-span-2">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-amber-50 text-amber-600 border border-amber-250 font-bold text-sm">
+                  9
+                </span>
+                <h2 className="text-xl font-bold text-slate-900">Keyboard Shortcuts (Multi-Key Hotkeys)</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-6">
+                Click inside the card below to focus it, then test key combinations:
+                <br />
+                - <kbd className="px-1 bg-slate-100 border rounded font-mono text-xs">Ctrl + Shift + S</kbd> to save.
+                <br />
+                - <kbd className="px-1 bg-slate-100 border rounded font-mono text-xs">Ctrl + Alt + K</kbd> to clear history.
+                <br />
+                - <kbd className="px-1 bg-slate-100 border rounded font-mono text-xs">Escape</kbd> to reset.
+              </p>
+
+              <div 
+                tabIndex={0}
+                data-testid="hotkey-listener-card"
+                onKeyDown={handleHotkeyKeyDown}
+                onKeyUp={handleHotkeyKeyUp}
+                className="max-w-md mx-auto rounded-xl bg-slate-50 hover:bg-slate-100/50 border border-slate-200 p-6 space-y-4 focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
+              >
+                <div className="text-center">
+                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">
+                    Click here to capture keystrokes
+                  </span>
+                </div>
+
+                {/* Pressed keys */}
+                <div className="flex justify-center items-center gap-1.5 min-h-[32px]">
+                  {heldKeys.length === 0 ? (
+                    <span className="text-[11px] text-slate-400 italic">No active keys pressed</span>
+                  ) : (
+                    heldKeys.map((k) => (
+                      <kbd 
+                        key={k} 
+                        data-testid="hotkey-active-keys"
+                        className="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] font-bold font-mono text-amber-400 shadow-sm"
+                      >
+                        {k}
+                      </kbd>
+                    ))
+                  )}
+                </div>
+
+                {hotkeyStatus && (
+                  <div 
+                    data-testid="hotkey-status-msg"
+                    className="text-xs text-center text-emerald-800 bg-emerald-50 border border-emerald-250 rounded-lg p-2 font-semibold"
+                  >
+                    {hotkeyStatus}
+                  </div>
+                )}
               </div>
             </div>
           </section>

@@ -1,8 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export default function NewTabPage() {
+  const [tabId, setTabId] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (id) {
+        setTabId(id);
+      }
+    }
+  }, []);
+
   return (
     <div className="flex-1 bg-slate-50 min-h-screen flex items-center justify-center p-4">
       <div className="mx-auto max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 shadow-md text-center">
@@ -15,8 +27,18 @@ export default function NewTabPage() {
           data-testid="new-tab-header"
           className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
         >
-          New Tab Content
+          New Tab Content{tabId ? ` - ID: ${tabId}` : ""}
         </h1>
+        {tabId && (
+          <div className="mt-3">
+            <span
+              data-testid="new-tab-id"
+              className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 border border-blue-200"
+            >
+              Tab {tabId}
+            </span>
+          </div>
+        )}
         <p className="mt-4 text-sm text-slate-500 leading-relaxed">
           This content was successfully loaded inside a completely separate browser tab. E2E automation tests can switch context to this page handler to inspect this element.
         </p>
